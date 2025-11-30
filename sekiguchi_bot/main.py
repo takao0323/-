@@ -6,6 +6,11 @@
 """
 
 import random
+import csv
+import os
+from datetime import datetime
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 def print_welcome():
@@ -105,6 +110,95 @@ def get_daily_report():
         "exercise": exercise,
         "meal": meal
     }
+
+
+def save_weight_data(name, weight):
+    """
+    体重データをCSVファイルに保存する
+
+    Args:
+        name (str): ユーザーの名前
+        weight (float): 体重（kg）
+    """
+    # ファイル名を生成（名前ごとに別ファイル）
+    filename = f"weight_data_{name}.csv"
+
+    # ファイルが存在しない場合はヘッダーを書き込む
+    file_exists = os.path.exists(filename)
+
+    with open(filename, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # 新規ファイルの場合はヘッダーを追加
+        if not file_exists:
+            writer.writerow(['日付', '体重(kg)'])
+
+        # データを追加
+        today = datetime.now().strftime('%Y-%m-%d')
+        writer.writerow([today, weight])
+
+
+def generate_weight_graph(name):
+    """
+    体重データからグラフを生成する
+
+    Args:
+        name (str): ユーザーの名前
+    """
+    filename = f"weight_data_{name}.csv"
+
+    # ファイルが存在しない場合は何もしない
+    if not os.path.exists(filename):
+        return
+
+    # CSVファイルからデータを読み込む
+    dates = []
+    weights = []
+
+    with open(filename, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        next(reader)  # ヘッダーをスキップ
+
+        for row in reader:
+            dates.append(datetime.strptime(row[0], '%Y-%m-%d'))
+            weights.append(float(row[1]))
+
+    # データが1件もない場合は何もしない
+    if len(dates) == 0:
+        return
+
+    # 日本語フォント設定（環境によって調整が必要）
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+
+    # グラフを生成
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, weights, marker='o', linestyle='-', linewidth=2, markersize=8)
+
+    # グラフの装飾
+    plt.title(f'{name}san no Weight Progress', fontsize=16, fontweight='bold')
+    plt.xlabel('Date', fontsize=12)
+    plt.ylabel('Weight (kg)', fontsize=12)
+    plt.grid(True, alpha=0.3)
+
+    # x軸の日付フォーマット
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.gcf().autofmt_xdate()  # 日付ラベルを斜めに表示
+
+    # y軸の範囲を少し広げる
+    if len(weights) > 0:
+        weight_min = min(weights)
+        weight_max = max(weights)
+        margin = (weight_max - weight_min) * 0.1 if weight_max != weight_min else 1
+        plt.ylim(weight_min - margin, weight_max + margin)
+
+    # グラフを保存
+    graph_filename = f"weight_graph_{name}.png"
+    plt.tight_layout()
+    plt.savefig(graph_filename, dpi=100, bbox_inches='tight')
+    plt.close()
+
+    print(f"\n📊 体重グラフを更新しました: {graph_filename}")
 
 
 def generate_feedback(profile, report):
@@ -367,8 +461,15 @@ def main():
             print("=" * 60)
             break
 
+        # 体重データを保存
+        name = user_profile.get("name", "あなた")
+        save_weight_data(name, daily_report["weight"])
+
         # フィードバックを生成・表示
         generate_feedback(user_profile, daily_report)
+
+        # グラフを生成・更新
+        generate_weight_graph(name)
 
         # 日数をカウントアップ
         day_count += 1
