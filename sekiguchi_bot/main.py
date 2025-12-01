@@ -256,6 +256,108 @@ def analyze_meal(meal_text):
     return good_points
 
 
+def get_purpose_specific_message(purpose, weight_change):
+    """
+    目的に応じた個別カスタマイズメッセージを生成
+
+    Args:
+        purpose (str): ユーザーの目的
+        weight_change (float or None): 体重変化
+
+    Returns:
+        str: 目的に応じたメッセージ
+    """
+    purpose_lower = purpose.lower()
+
+    # ダイエット向けメッセージ
+    if 'ダイエット' in purpose or '減量' in purpose or '痩せ' in purpose:
+        if weight_change is not None:
+            if weight_change < 0:
+                return f"ダイエット順調ですね！無理なく続けていきましょう"
+            elif weight_change > 0:
+                return "体重が増えても焦る必要はありません。筋肉が増えている可能性もありますよ"
+            else:
+                return "停滞期かもしれませんね。続ければ必ず突破できます"
+        return "ダイエットは焦らず、着実に進めていきましょう"
+
+    # 増量向けメッセージ
+    elif '増量' in purpose or '筋肉' in purpose or 'バルク' in purpose:
+        if weight_change is not None:
+            if weight_change > 0:
+                return f"増量順調です！タンパク質摂取を意識して続けましょう"
+            elif weight_change < 0:
+                return "もう少しカロリー摂取を増やしても良いかもしれませんね"
+            else:
+                return "体重を増やすには、少し食事量を増やしてみましょう"
+        return "筋肉をつけながら健康的に体重を増やしていきましょう"
+
+    # 健康維持向けメッセージ
+    elif '健康' in purpose or '維持' in purpose or '体型' in purpose:
+        if weight_change is not None:
+            if abs(weight_change) < 0.5:
+                return f"体重を上手に維持できていますね。素晴らしいです"
+            else:
+                return "多少の変動は気にせず、今のペースで続けましょう"
+        return "健康的な生活習慣を継続することが大切です"
+
+    # その他
+    else:
+        return "あなたの目標に向かって、一緒に頑張っていきましょう"
+
+
+def get_purpose_specific_tips(purpose):
+    """
+    目的に応じた改善ポイントを返す
+
+    Args:
+        purpose (str): ユーザーの目的
+
+    Returns:
+        list: 目的に応じた改善ポイントのリスト
+    """
+    purpose_lower = purpose.lower()
+    tips = []
+
+    # ダイエット向けアドバイス
+    if 'ダイエット' in purpose or '減量' in purpose or '痩せ' in purpose:
+        tips = [
+            "夕食は軽めにして、寝る3時間前には済ませましょう",
+            "有酸素運動を20分以上続けると脂肪燃焼効果が高まります",
+            "間食を減らして、1日3食を規則正しく摂りましょう",
+            "水分をしっかり摂って代謝を上げましょう",
+            "食事の記録をつけると、食べ過ぎを防げますよ",
+        ]
+
+    # 増量向けアドバイス
+    elif '増量' in purpose or '筋肉' in purpose or 'バルク' in purpose:
+        tips = [
+            "筋トレ後30分以内にタンパク質を摂取しましょう",
+            "1日5-6回に分けて食事を摂ると吸収効率が上がります",
+            "炭水化物もしっかり摂って、筋肉の材料を確保しましょう",
+            "筋トレは週3-4回、しっかり休息を取りながら行いましょう",
+            "プロテインを活用して、タンパク質を補給しましょう",
+        ]
+
+    # 健康維持向けアドバイス
+    elif '健康' in purpose or '維持' in purpose or '体型' in purpose:
+        tips = [
+            "バランスの良い食事を心がけましょう",
+            "適度な運動習慣を維持することが大切です",
+            "睡眠時間を確保して、体を休めましょう",
+            "ストレス管理も健康維持には重要ですよ",
+            "定期的な健康チェックを忘れずに",
+        ]
+
+    # その他
+    else:
+        tips = [
+            "無理なく続けられるペースを見つけましょう",
+            "自分に合った方法を探していきましょう",
+        ]
+
+    return tips
+
+
 def generate_weight_graph(name):
     """
     体重データからグラフを生成する
@@ -402,6 +504,10 @@ def generate_feedback(profile, report):
             print(f"\n📊 体重変化: 変化なし")
             print(f"体重は毎日変動するものです。焦らず継続していきましょう。")
 
+    # 目的別カスタマイズメッセージ
+    purpose_message = get_purpose_specific_message(profile.get('purpose', ''), weight_change)
+    print(f"\n🎯 {name}さんへ: {purpose_message}")
+
     # 良かった点を生成
     print("\n✨ 良かった点:")
     good_points = []
@@ -442,7 +548,11 @@ def generate_feedback(profile, report):
 
     # 改善ポイントを生成（1つだけ）
     print("\n💡 改善ポイント（1つだけ！）:")
-    improvement_tips = [
+
+    # 目的別の改善ポイントを取得
+    purpose_tips = get_purpose_specific_tips(profile.get('purpose', ''))
+
+    improvement_tips = purpose_tips + [
         # 運動関連（1-15）
         "明日は運動の時間を少しだけ増やしてみましょう！",
         "ストレッチを5分追加するだけでも効果的です！",
