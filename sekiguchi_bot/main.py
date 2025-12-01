@@ -176,7 +176,7 @@ def calculate_nutrition_baseline(meal_records):
 
 def calculate_target_nutrition(profile, baseline):
     """
-    体重の5%/月をベースに目標カロリーとPFCを計算する
+    体重の3-5%/月をベースに目標カロリーとPFCを計算する
 
     Args:
         profile (dict): ユーザーのプロフィール情報
@@ -184,10 +184,14 @@ def calculate_target_nutrition(profile, baseline):
 
     Returns:
         dict: 目標カロリーとPFC
+
+    Note:
+        - 山ごもりモード: 体重の5%/月（最大ペース）
+        - ベーシックモード: 体重の3%/月（推奨・標準ペース）
     """
     baseline_calories = baseline['avg_calories']
 
-    # カロリー調整量を決定（体重の5%/月ベース）
+    # カロリー調整量を決定（体重の3-5%/月ベース）
     calorie_adjustment = 0
     monthly_weight_loss_kg = 0
 
@@ -195,10 +199,10 @@ def calculate_target_nutrition(profile, baseline):
         current_weight = profile['current_weight']
         mode = profile['calorie_mode']
 
-        # ハードモード: 体重の5%/月、マイルドモード: 体重の3%/月
-        if mode == "ハード":
+        # 山ごもりモード: 体重の5%/月、ベーシックモード: 体重の3%/月
+        if mode == "山ごもり":
             monthly_weight_loss_kg = current_weight * 0.05
-        else:  # マイルド
+        else:  # ベーシック
             monthly_weight_loss_kg = current_weight * 0.03
 
         # 1日あたりの目標減量（kg/日）
@@ -284,16 +288,16 @@ def get_user_profile(plan):
         print("\n" + "-" * 60)
         print("【カロリー調整モード】")
         print("-" * 60)
-        print("ハードモード: 体重の5%/月を目標（最大ペース）")
-        print("マイルドモード: 体重の3%/月を目標（ゆっくりペース）")
+        print("山ごもりモード: 体重の5%/月を目標（最大ペース）")
+        print("ベーシックモード: 体重の3%/月を目標（推奨・標準ペース）")
 
         while True:
-            mode = input("\nどちらのモードで進めますか？（ハード または マイルド）\n> ").strip()
-            if mode in ["ハード", "マイルド"]:
+            mode = input("\nどちらのモードで進めますか？（山ごもり または ベーシック）\n> ").strip()
+            if mode in ["山ごもり", "ベーシック"]:
                 calorie_mode = mode
                 break
             else:
-                print("「ハード」または「マイルド」と入力してください。")
+                print("「山ごもり」または「ベーシック」と入力してください。")
 
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
