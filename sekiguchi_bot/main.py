@@ -188,6 +188,74 @@ def save_weight_data(name, weight):
         writer.writerow([today, weight])
 
 
+def get_previous_weight(name):
+    """
+    前回の体重を取得する
+
+    Args:
+        name (str): ユーザーの名前
+
+    Returns:
+        float or None: 前回の体重（データがない場合はNone）
+    """
+    filename = f"weight_data_{name}.csv"
+
+    if not os.path.exists(filename):
+        return None
+
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader)  # ヘッダーをスキップ
+
+            weights = []
+            for row in reader:
+                if len(row) >= 2:
+                    weights.append(float(row[1]))
+
+            if len(weights) > 0:
+                return weights[-1]  # 最後の体重を返す
+    except:
+        pass
+
+    return None
+
+
+def analyze_meal(meal_text):
+    """
+    食事内容から良い点を見つける
+
+    Args:
+        meal_text (str): 食事内容のテキスト
+
+    Returns:
+        list: 見つかった良い点のリスト
+    """
+    good_points = []
+    meal_lower = meal_text.lower()
+
+    # タンパク質関連
+    protein_foods = ['鶏肉', '鶏胸肉', 'ささみ', '魚', 'サーモン', '卵', 'プロテイン', '豆腐', '納豆', 'チキン']
+    if any(food in meal_text for food in protein_foods):
+        good_points.append("タンパク質をしっかり摂取されていますね")
+
+    # 野菜関連
+    vegetable_words = ['サラダ', '野菜', 'ブロッコリー', 'ほうれん草', 'キャベツ', 'トマト']
+    if any(word in meal_text for word in vegetable_words):
+        good_points.append("野菜を意識されていて素晴らしいです")
+
+    # 健康的な炭水化物
+    healthy_carbs = ['玄米', 'オートミール', '全粒粉', 'さつまいも']
+    if any(carb in meal_text for carb in healthy_carbs):
+        good_points.append("質の良い炭水化物を選んでいますね")
+
+    # 小分け・バランス
+    if '、' in meal_text or '小分け' in meal_text:
+        good_points.append("バランスよく食べられていますね")
+
+    return good_points
+
+
 def generate_weight_graph(name):
     """
     体重データからグラフを生成する
@@ -310,19 +378,51 @@ def generate_feedback(profile, report):
     # 名前を取得（デフォルトは「あなた」）
     name = profile.get("name", "あなた")
 
+    # 前回の体重を取得
+    previous_weight = get_previous_weight(name)
+    current_weight = report["weight"]
+    weight_change = None
+    if previous_weight is not None:
+        weight_change = current_weight - previous_weight
+
     print("\n" + "-" * 60)
     print("【関口メンターからのフィードバック】")
     print("-" * 60)
+
+    # 体重変化のメッセージ
+    if weight_change is not None:
+        if weight_change > 0:
+            print(f"\n📊 体重変化: +{weight_change:.1f}kg")
+            print(f"停滞しても、逆に増えていてもあきらめる必要は全くありません！")
+            print(f"突然ストンと落ちる日がありますから、そこから加速させていきましょう。")
+        elif weight_change < 0:
+            print(f"\n📊 体重変化: {weight_change:.1f}kg")
+            print(f"順調ですね！この調子で続けていきましょう。")
+        else:
+            print(f"\n📊 体重変化: 変化なし")
+            print(f"体重は毎日変動するものです。焦らず継続していきましょう。")
 
     # 良かった点を生成
     print("\n✨ 良かった点:")
     good_points = []
 
+    # このメッセージを読んでいること自体を褒める
+    good_points.append(f"{name}さん、このメッセージを読んでくれただけでも前向きな気持ちの表れです")
+
     # 運動したかチェック
     if report["exercise"].strip():
-        good_points.append(f"「{report['exercise']}」をやったこと、素晴らしいです！")
-    else:
-        good_points.append("報告をしっかりしてくれたこと、それ自体が素晴らしい一歩です！")
+        good_points.append(f"「{report['exercise']}」をやったこと、素晴らしいです")
+        # 頑張り過ぎない大切さを伝える
+        if random.random() < 0.3:  # 30%の確率で表示
+            good_points.append("頑張り過ぎると続かなかったりしますから、今のペースがかえって良いんですよ")
+
+    # 食事内容から良い点を見つける
+    meal_good_points = analyze_meal(report["meal"])
+    if meal_good_points:
+        good_points.extend(meal_good_points[:1])  # 最初の1つだけ追加
+
+    # できたことに目を向けるメッセージ
+    good_points.append("人間、できなかったことに目が向きがちですが、意外とできたことも多いものですよ")
 
     # 体重報告のチェック
     good_points.append("毎日体重を測って記録する習慣、これがとても大切です！")
@@ -526,6 +626,18 @@ def generate_feedback(profile, report):
         f"{name}さん、今日の小さな努力が、明日の自信に変わります",
         f"{name}さん、一歩ずつで大丈夫。私は伴走者として、見守っています",
         "小さな成功を積み重ねる。それが目標達成への確実な道です",
+
+        # 関口さん実際のメッセージ風（71-80）
+        "明日も積み上げていきましょう！",
+        "できたことに目を向ければ、前進していることがわかりますよ",
+        "頑張ってる感を出さないのも大切なポイントです",
+        "今のペースがかえって良いんですよ",
+        "突然ストンと落ちる日がありますから、焦らず続けましょう",
+        "人間、できなかったことに目が向きがちですが、できたことも多いものですよ",
+        "あきらめる必要は全くありません！そこから加速させていきましょう",
+        "前向きな気持ちで続けていけば、必ず結果が出ます",
+        "この調子で無理なく続けていきましょう",
+        "できたことを数えて、明日につなげていきましょう",
     ]
     print(f"  {random.choice(encouragement_messages)}")
     print("-" * 60)
