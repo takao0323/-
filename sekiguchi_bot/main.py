@@ -176,7 +176,7 @@ def calculate_nutrition_baseline(meal_records):
 
 def calculate_target_nutrition(profile, baseline):
     """
-    性別とモードに基づいて目標カロリーとPFCを計算する
+    体重の5%/月をベースに目標カロリーとPFCを計算する
 
     Args:
         profile (dict): ユーザーのプロフィール情報
@@ -187,22 +187,26 @@ def calculate_target_nutrition(profile, baseline):
     """
     baseline_calories = baseline['avg_calories']
 
-    # カロリー調整量を決定
+    # カロリー調整量を決定（体重の5%/月ベース）
     calorie_adjustment = 0
-    if profile.get('calorie_mode'):
-        gender = profile.get('gender', '男性')
+    monthly_weight_loss_kg = 0
+
+    if profile.get('calorie_mode') and profile.get('current_weight'):
+        current_weight = profile['current_weight']
         mode = profile['calorie_mode']
 
-        if gender == "男性":
-            if mode == "ハード":
-                calorie_adjustment = -500
-            else:  # マイルド
-                calorie_adjustment = -300
-        else:  # 女性
-            if mode == "ハード":
-                calorie_adjustment = -400
-            else:  # マイルド
-                calorie_adjustment = -200
+        # ハードモード: 体重の5%/月、マイルドモード: 体重の3%/月
+        if mode == "ハード":
+            monthly_weight_loss_kg = current_weight * 0.05
+        else:  # マイルド
+            monthly_weight_loss_kg = current_weight * 0.03
+
+        # 1日あたりの目標減量（kg/日）
+        daily_weight_loss_kg = monthly_weight_loss_kg / 30
+
+        # 1kgの体脂肪 = 約7200kcal
+        # 1日あたりの必要カロリー削減
+        calorie_adjustment = -(daily_weight_loss_kg * 7200)
 
     # 目標カロリーを計算
     target_calories = baseline_calories + calorie_adjustment
@@ -222,7 +226,8 @@ def calculate_target_nutrition(profile, baseline):
         "target_protein": target_protein,
         "target_fat": target_fat,
         "target_carbs": target_carbs,
-        "calorie_adjustment": calorie_adjustment
+        "calorie_adjustment": calorie_adjustment,
+        "monthly_weight_loss_kg": monthly_weight_loss_kg
     }
 
 
@@ -254,6 +259,16 @@ def get_user_profile(plan):
     # 目的を入力してもらう
     purpose = input("\n【目的】目標は何ですか？（例：ダイエット、増量、健康維持など）\n> ")
 
+    # 現在の体重を入力してもらう
+    current_weight_kg = None
+    while True:
+        try:
+            current_weight = input("\n【現在の体重】現在の体重は何kgですか？\n> ")
+            current_weight_kg = float(current_weight)
+            break
+        except ValueError:
+            print("数字で入力してください（小数点もOKです）。")
+
     # 目標体重を入力してもらう
     while True:
         try:
@@ -269,12 +284,8 @@ def get_user_profile(plan):
         print("\n" + "-" * 60)
         print("【カロリー調整モード】")
         print("-" * 60)
-        if gender == "男性":
-            print("ハードモード: -500kcal（しっかり減量）")
-            print("マイルドモード: -300kcal（無理なく減量）")
-        else:
-            print("ハードモード: -400kcal（しっかり減量）")
-            print("マイルドモード: -200kcal（無理なく減量）")
+        print("ハードモード: 体重の5%/月を目標（最大ペース）")
+        print("マイルドモード: 体重の3%/月を目標（ゆっくりペース）")
 
         while True:
             mode = input("\nどちらのモードで進めますか？（ハード または マイルド）\n> ").strip()
@@ -287,7 +298,10 @@ def get_user_profile(plan):
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
     print(f"目標は「{purpose}」ですね。")
-    print(f"{plan['days']}日間で{target_weight_kg}kgを目指しましょう！")
+    if current_weight_kg and target_weight_kg:
+        weight_diff = current_weight_kg - target_weight_kg
+        print(f"現在{current_weight_kg}kg → 目標{target_weight_kg}kg（-{weight_diff:.1f}kg）")
+        print(f"{plan['days']}日間で達成を目指しましょう！")
     if calorie_mode:
         print(f"カロリー調整は{calorie_mode}モードで進めます！")
     print("一緒に頑張りましょう💪")
@@ -298,6 +312,7 @@ def get_user_profile(plan):
         "name": name,
         "gender": gender,
         "purpose": purpose,
+        "current_weight": current_weight_kg,
         "target_weight": target_weight_kg,
         "calorie_mode": calorie_mode,
         "plan": plan
@@ -1019,13 +1034,22 @@ def main():
         print("\n" + "=" * 60)
         print("【あなた専用の栄養目標が設定されました！】")
         print("=" * 60)
-        print(f"\n📊 準備期間の平均摂取カロリー: {baseline['avg_calories']:.0f}kcal")
-        print(f"📉 カロリー調整: {nutrition_target['calorie_adjustment']:+.0f}kcal")
+
+        # 体重ベースの目標を表示
+        if nutrition_target.get('monthly_weight_loss_kg'):
+            monthly_loss = nutrition_target['monthly_weight_loss_kg']
+            print(f"\n⚖️  月間目標減量: {monthly_loss:.1f}kg/月")
+            print(f"   1日あたり: 約{monthly_loss/30:.3f}kg/日")
+
+        print(f"\n📊 準備期間の平均摂取カロリー: {baseline['avg_calories']:.0f}kcal/日")
+        print(f"📉 カロリー調整: {nutrition_target['calorie_adjustment']:+.0f}kcal/日")
         print(f"🎯 目標カロリー: {nutrition_target['target_calories']:.0f}kcal/日")
+
         print(f"\n【目標PFCバランス（P:30% F:20% C:50%）】")
         print(f"  タンパク質: {nutrition_target['target_protein']:.1f}g")
         print(f"  脂質: {nutrition_target['target_fat']:.1f}g")
         print(f"  炭水化物: {nutrition_target['target_carbs']:.1f}g")
+
         print("\nこの目標に向かって、一緒に頑張りましょう！")
         print("=" * 60)
 
