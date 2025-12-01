@@ -9,6 +9,7 @@ import random
 import csv
 import os
 import json
+import base64
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -78,6 +79,153 @@ def select_plan():
             print("1, 2, 3のいずれかを入力してください。")
 
 
+def conduct_preparation_period(profile):
+    """
+    準備期間（3日間）の食事記録を行う
+
+    Args:
+        profile (dict): ユーザーのプロフィール情報
+
+    Returns:
+        list: 3日間の食事記録のリスト
+    """
+    print("\n" + "=" * 60)
+    print("【準備期間：3日間の食事記録】")
+    print("=" * 60)
+    print(f"\n{profile['name']}さん、まずは3日間、普段通りの食事を記録してください。")
+    print("この記録から、あなたに最適なカロリーとPFCバランスを設定します！")
+    print("\n食事の写真がある場合は画像パスを入力してください。")
+    print("画像がない場合はスキップして、食事内容を直接入力できます。")
+    print("-" * 60)
+
+    meal_records = []
+
+    for day in range(1, 4):
+        print(f"\n📅 {day}日目の食事記録")
+        print("-" * 60)
+
+        # 画像パスの入力（オプション）
+        image_path = input("\n食事の画像ファイルパス（スキップする場合はEnter）\n> ").strip()
+
+        # 食事内容の入力
+        meal_description = input("\n食事内容を教えてください（例：朝：パン、卵、サラダ／昼：定食／夜：魚、野菜）\n> ").strip()
+
+        # カロリーとPFCの入力
+        print("\nカロリーとPFC（タンパク質・脂質・炭水化物）を入力してください。")
+        print("概算でOKです！わからない場合は推定値を入力してください。")
+
+        while True:
+            try:
+                calories = float(input("\n総カロリー（kcal）\n> "))
+                protein = float(input("タンパク質（g）\n> "))
+                fat = float(input("脂質（g）\n> "))
+                carbs = float(input("炭水化物（g）\n> "))
+                break
+            except ValueError:
+                print("数字で入力してください。")
+
+        # 記録を保存
+        meal_record = {
+            "day": day,
+            "image_path": image_path if image_path else None,
+            "meal_description": meal_description,
+            "calories": calories,
+            "protein": protein,
+            "fat": fat,
+            "carbs": carbs
+        }
+        meal_records.append(meal_record)
+
+        print(f"\n✅ {day}日目の記録が完了しました！")
+
+    # 準備期間完了メッセージ
+    print("\n" + "=" * 60)
+    print("🎉 3日間の準備期間が完了しました！")
+    print("=" * 60)
+
+    return meal_records
+
+
+def calculate_nutrition_baseline(meal_records):
+    """
+    3日間の食事記録から平均カロリーとPFCを計算する
+
+    Args:
+        meal_records (list): 3日間の食事記録
+
+    Returns:
+        dict: 平均カロリーとPFC
+    """
+    total_calories = sum(record['calories'] for record in meal_records)
+    total_protein = sum(record['protein'] for record in meal_records)
+    total_fat = sum(record['fat'] for record in meal_records)
+    total_carbs = sum(record['carbs'] for record in meal_records)
+
+    avg_calories = total_calories / len(meal_records)
+    avg_protein = total_protein / len(meal_records)
+    avg_fat = total_fat / len(meal_records)
+    avg_carbs = total_carbs / len(meal_records)
+
+    return {
+        "avg_calories": avg_calories,
+        "avg_protein": avg_protein,
+        "avg_fat": avg_fat,
+        "avg_carbs": avg_carbs
+    }
+
+
+def calculate_target_nutrition(profile, baseline):
+    """
+    性別とモードに基づいて目標カロリーとPFCを計算する
+
+    Args:
+        profile (dict): ユーザーのプロフィール情報
+        baseline (dict): 準備期間の平均栄養データ
+
+    Returns:
+        dict: 目標カロリーとPFC
+    """
+    baseline_calories = baseline['avg_calories']
+
+    # カロリー調整量を決定
+    calorie_adjustment = 0
+    if profile.get('calorie_mode'):
+        gender = profile.get('gender', '男性')
+        mode = profile['calorie_mode']
+
+        if gender == "男性":
+            if mode == "ハード":
+                calorie_adjustment = -500
+            else:  # マイルド
+                calorie_adjustment = -300
+        else:  # 女性
+            if mode == "ハード":
+                calorie_adjustment = -400
+            else:  # マイルド
+                calorie_adjustment = -200
+
+    # 目標カロリーを計算
+    target_calories = baseline_calories + calorie_adjustment
+
+    # 目標PFCを計算（P:30%, F:20%, C:50%）
+    # 1gあたりのカロリー：タンパク質=4kcal, 脂質=9kcal, 炭水化物=4kcal
+    protein_calories = target_calories * 0.30
+    fat_calories = target_calories * 0.20
+    carbs_calories = target_calories * 0.50
+
+    target_protein = protein_calories / 4
+    target_fat = fat_calories / 9
+    target_carbs = carbs_calories / 4
+
+    return {
+        "target_calories": target_calories,
+        "target_protein": target_protein,
+        "target_fat": target_fat,
+        "target_carbs": target_carbs,
+        "calorie_adjustment": calorie_adjustment
+    }
+
+
 def get_user_profile(plan):
     """
     ユーザーのプロフィール情報を入力してもらう
@@ -86,7 +234,7 @@ def get_user_profile(plan):
         plan (dict): 選択されたプラン情報
 
     Returns:
-        dict: ユーザーのプロフィール情報（名前、目的、目標体重、プラン情報）
+        dict: ユーザーのプロフィール情報（名前、性別、目的、目標体重、カロリー調整モード、プラン情報）
     """
     print("\nそれでは、あなたのことを教えてください！\n")
 
@@ -94,6 +242,14 @@ def get_user_profile(plan):
     name = input("【お名前】何とお呼びすればよいですか？（例：太郎、花子など）\n> ").strip()
     if not name:
         name = "あなた"  # 入力がない場合はデフォルト
+
+    # 性別を入力してもらう
+    while True:
+        gender = input("\n【性別】性別を教えてください（男性 または 女性）\n> ").strip()
+        if gender in ["男性", "女性"]:
+            break
+        else:
+            print("「男性」または「女性」と入力してください。")
 
     # 目的を入力してもらう
     purpose = input("\n【目的】目標は何ですか？（例：ダイエット、増量、健康維持など）\n> ")
@@ -107,28 +263,56 @@ def get_user_profile(plan):
         except ValueError:
             print("数字で入力してください（小数点もOKです）。")
 
+    # カロリー調整モードを選択してもらう（ダイエット目的の場合のみ）
+    calorie_mode = None
+    if 'ダイエット' in purpose or '減量' in purpose or '痩せ' in purpose:
+        print("\n" + "-" * 60)
+        print("【カロリー調整モード】")
+        print("-" * 60)
+        if gender == "男性":
+            print("ハードモード: -500kcal（しっかり減量）")
+            print("マイルドモード: -300kcal（無理なく減量）")
+        else:
+            print("ハードモード: -400kcal（しっかり減量）")
+            print("マイルドモード: -200kcal（無理なく減量）")
+
+        while True:
+            mode = input("\nどちらのモードで進めますか？（ハード または マイルド）\n> ").strip()
+            if mode in ["ハード", "マイルド"]:
+                calorie_mode = mode
+                break
+            else:
+                print("「ハード」または「マイルド」と入力してください。")
+
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
     print(f"目標は「{purpose}」ですね。")
     print(f"{plan['days']}日間で{target_weight_kg}kgを目指しましょう！")
+    if calorie_mode:
+        print(f"カロリー調整は{calorie_mode}モードで進めます！")
     print("一緒に頑張りましょう💪")
     print("-" * 60 + "\n")
 
     # プロフィール情報を辞書形式で返す
     return {
         "name": name,
+        "gender": gender,
         "purpose": purpose,
         "target_weight": target_weight_kg,
+        "calorie_mode": calorie_mode,
         "plan": plan
     }
 
 
-def get_daily_report():
+def get_daily_report(with_nutrition=False):
     """
     今日の報告を入力してもらう
 
+    Args:
+        with_nutrition (bool): カロリーとPFCも記録するかどうか
+
     Returns:
-        dict or None: 今日の報告内容（体重、運動、食事）。終了の場合はNone
+        dict or None: 今日の報告内容（体重、運動、食事、カロリー、PFC）。終了の場合はNone
     """
     print("\n" + "=" * 60)
     print("今日の報告をお願いします！")
@@ -146,7 +330,7 @@ def get_daily_report():
         today_weight = float(weight_input)
     except ValueError:
         print("数字で入力してください。今回の報告をスキップします。")
-        return get_daily_report()  # もう一度入力を求める
+        return get_daily_report(with_nutrition)  # もう一度入力を求める
 
     # 運動内容を入力してもらう
     exercise = input("\n【今日の運動】今日はどんな運動をしましたか？\n> ")
@@ -154,11 +338,31 @@ def get_daily_report():
     # 食事内容を入力してもらう
     meal = input("\n【今日の食事】今日食べたものを教えてください（ざっくりでOK）\n> ")
 
+    # カロリーとPFCの記録（オプション）
+    calories = None
+    protein = None
+    fat = None
+    carbs = None
+
+    if with_nutrition:
+        print("\n【栄養記録】今日のカロリーとPFCを記録しましょう（概算でOK）")
+        try:
+            calories = float(input("総カロリー（kcal）\n> "))
+            protein = float(input("タンパク質（g）\n> "))
+            fat = float(input("脂質（g）\n> "))
+            carbs = float(input("炭水化物（g）\n> "))
+        except ValueError:
+            print("数値の入力に失敗しました。栄養記録はスキップします。")
+
     # 報告内容を辞書形式で返す
     return {
         "weight": today_weight,
         "exercise": exercise,
-        "meal": meal
+        "meal": meal,
+        "calories": calories,
+        "protein": protein,
+        "fat": fat,
+        "carbs": carbs
     }
 
 
@@ -491,6 +695,34 @@ def generate_feedback(profile, report):
     print("【関口メンターからのフィードバック】")
     print("-" * 60)
 
+    # カロリーとPFCの比較（目標が設定されている場合）
+    if report.get('calories') and profile.get('nutrition_target'):
+        target = profile['nutrition_target']
+        print("\n📊 栄養バランス:")
+        print(f"  カロリー: {report['calories']:.0f}kcal / 目標 {target['target_calories']:.0f}kcal")
+
+        cal_diff = report['calories'] - target['target_calories']
+        if abs(cal_diff) <= 100:
+            print(f"  → 目標ピッタリです！素晴らしい👍")
+        elif cal_diff > 0:
+            print(f"  → 目標より{cal_diff:.0f}kcal多めです。明日調整しましょう")
+        else:
+            print(f"  → 目標より{abs(cal_diff):.0f}kcal少なめです")
+
+        if report.get('protein') and report.get('fat') and report.get('carbs'):
+            print(f"\n  タンパク質: {report['protein']:.1f}g / 目標 {target['target_protein']:.1f}g")
+            print(f"  脂質: {report['fat']:.1f}g / 目標 {target['target_fat']:.1f}g")
+            print(f"  炭水化物: {report['carbs']:.1f}g / 目標 {target['target_carbs']:.1f}g")
+
+            # PFCバランスをチェック
+            total_pfc = report['protein'] + report['fat'] + report['carbs']
+            if total_pfc > 0:
+                p_ratio = (report['protein'] * 4 / report['calories']) * 100
+                f_ratio = (report['fat'] * 9 / report['calories']) * 100
+                c_ratio = (report['carbs'] * 4 / report['calories']) * 100
+                print(f"\n  PFCバランス: P{p_ratio:.0f}% F{f_ratio:.0f}% C{c_ratio:.0f}%")
+                print(f"  目標バランス: P30% F20% C50%")
+
     # 体重変化のメッセージ
     if weight_change is not None:
         if weight_change > 0:
@@ -764,11 +996,46 @@ def main():
     # ユーザーのプロフィールを取得
     user_profile = get_user_profile(selected_plan)
 
+    # 準備期間を実施（ダイエット目的の場合のみ）
+    enable_nutrition_tracking = False
+    if user_profile.get('calorie_mode'):
+        # 3日間の食事記録を実施
+        meal_records = conduct_preparation_period(user_profile)
+
+        # 平均カロリーとPFCを計算
+        baseline = calculate_nutrition_baseline(meal_records)
+
+        # 目標カロリーとPFCを計算
+        nutrition_target = calculate_target_nutrition(user_profile, baseline)
+
+        # プロフィールに目標栄養データを追加
+        user_profile['nutrition_target'] = nutrition_target
+        user_profile['nutrition_baseline'] = baseline
+
+        # 栄養記録を有効化
+        enable_nutrition_tracking = True
+
+        # 目標を表示
+        print("\n" + "=" * 60)
+        print("【あなた専用の栄養目標が設定されました！】")
+        print("=" * 60)
+        print(f"\n📊 準備期間の平均摂取カロリー: {baseline['avg_calories']:.0f}kcal")
+        print(f"📉 カロリー調整: {nutrition_target['calorie_adjustment']:+.0f}kcal")
+        print(f"🎯 目標カロリー: {nutrition_target['target_calories']:.0f}kcal/日")
+        print(f"\n【目標PFCバランス（P:30% F:20% C:50%）】")
+        print(f"  タンパク質: {nutrition_target['target_protein']:.1f}g")
+        print(f"  脂質: {nutrition_target['target_fat']:.1f}g")
+        print(f"  炭水化物: {nutrition_target['target_carbs']:.1f}g")
+        print("\nこの目標に向かって、一緒に頑張りましょう！")
+        print("=" * 60)
+
     # プロフィールを保存
     save_profile(user_profile)
 
     # 報告ループ開始のメッセージ
     print("\nそれでは、日々の報告を始めましょう！")
+    if enable_nutrition_tracking:
+        print("※ カロリーとPFCの記録もお願いします")
     print("（いつでも体重入力で「exit」または「終了」と入力すると終了できます）\n")
 
     # 日々の報告ループ
@@ -792,8 +1059,8 @@ def main():
 
         print(f"\n📅 {day_count}日目の報告（残り{remaining_days}日）")
 
-        # 今日の報告を取得
-        daily_report = get_daily_report()
+        # 今日の報告を取得（栄養記録の有無を指定）
+        daily_report = get_daily_report(with_nutrition=enable_nutrition_tracking)
 
         # Noneが返ってきたら終了
         if daily_report is None:
