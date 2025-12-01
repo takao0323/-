@@ -39,3 +39,4 @@ Thumbs.db
 # Sekiguchi Bot Data
 weight_data_*.csv
 weight_graph_*.png
+profile_*.json

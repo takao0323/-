@@ -8,9 +8,33 @@
 import random
 import csv
 import os
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+
+
+# プラン定義
+PLANS = {
+    "1": {
+        "name": "３日間お試しプラン",
+        "price": "550円",
+        "days": 3,
+        "description": "まずは3日間、気軽に試してみましょう！"
+    },
+    "2": {
+        "name": "３ヵ月プラン",
+        "price": "月額990円",
+        "days": 90,
+        "description": "じっくり体質改善！3ヶ月でしっかり結果を出しましょう"
+    },
+    "3": {
+        "name": "６ヵ月プラン",
+        "price": "月額880円",
+        "days": 180,
+        "description": "最もお得！半年かけて理想の体を手に入れましょう"
+    }
+}
 
 
 def print_welcome():
@@ -22,14 +46,49 @@ def print_welcome():
     print()
 
 
-def get_user_profile():
+def select_plan():
+    """
+    プランを選択してもらう
+
+    Returns:
+        dict: 選択されたプラン情報
+    """
+    print("\n" + "=" * 60)
+    print("【プラン選択】")
+    print("=" * 60)
+    print("\nまずは、あなたに合ったプランを選びましょう！\n")
+
+    # プランを表示
+    for key, plan in PLANS.items():
+        print(f"【{key}】{plan['name']} - {plan['price']}")
+        print(f"    {plan['description']}")
+        print()
+
+    # プランを選択
+    while True:
+        choice = input("プランを選択してください（1, 2, 3）\n> ").strip()
+        if choice in PLANS:
+            selected_plan = PLANS[choice].copy()
+            selected_plan["start_date"] = datetime.now().strftime('%Y-%m-%d')
+            print(f"\n{selected_plan['name']}を選択しました！")
+            print(f"期間: {selected_plan['days']}日間")
+            print(f"料金: {selected_plan['price']}")
+            return selected_plan
+        else:
+            print("1, 2, 3のいずれかを入力してください。")
+
+
+def get_user_profile(plan):
     """
     ユーザーのプロフィール情報を入力してもらう
 
+    Args:
+        plan (dict): 選択されたプラン情報
+
     Returns:
-        dict: ユーザーのプロフィール情報（名前、目的、期間、目標体重）
+        dict: ユーザーのプロフィール情報（名前、目的、目標体重、プラン情報）
     """
-    print("まずは、あなたのことを教えてください！\n")
+    print("\nそれでは、あなたのことを教えてください！\n")
 
     # 名前を入力してもらう
     name = input("【お名前】何とお呼びすればよいですか？（例：太郎、花子など）\n> ").strip()
@@ -38,15 +97,6 @@ def get_user_profile():
 
     # 目的を入力してもらう
     purpose = input("\n【目的】目標は何ですか？（例：ダイエット、増量、健康維持など）\n> ")
-
-    # 期間を入力してもらう（数字として受け取る）
-    while True:
-        try:
-            period = input("\n【期間】何ヶ月で達成したいですか？（数字で入力）\n> ")
-            period_months = int(period)
-            break
-        except ValueError:
-            print("数字で入力してください。")
 
     # 目標体重を入力してもらう
     while True:
@@ -60,7 +110,7 @@ def get_user_profile():
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
     print(f"目標は「{purpose}」ですね。")
-    print(f"{period_months}ヶ月で{target_weight_kg}kgを目指しましょう！")
+    print(f"{plan['days']}日間で{target_weight_kg}kgを目指しましょう！")
     print("一緒に頑張りましょう💪")
     print("-" * 60 + "\n")
 
@@ -68,8 +118,8 @@ def get_user_profile():
     return {
         "name": name,
         "purpose": purpose,
-        "period_months": period_months,
-        "target_weight": target_weight_kg
+        "target_weight": target_weight_kg,
+        "plan": plan
     }
 
 
@@ -199,6 +249,54 @@ def generate_weight_graph(name):
     plt.close()
 
     print(f"\n📊 体重グラフを更新しました: {graph_filename}")
+
+
+def save_profile(profile):
+    """
+    プロフィール情報をJSONファイルに保存する
+
+    Args:
+        profile (dict): ユーザーのプロフィール情報
+    """
+    filename = f"profile_{profile['name']}.json"
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(profile, f, ensure_ascii=False, indent=2)
+
+
+def load_profile(name):
+    """
+    プロフィール情報をJSONファイルから読み込む
+
+    Args:
+        name (str): ユーザーの名前
+
+    Returns:
+        dict or None: プロフィール情報（ファイルがない場合はNone）
+    """
+    filename = f"profile_{name}.json"
+    if os.path.exists(filename):
+        with open(filename, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
+
+
+def calculate_remaining_days(profile):
+    """
+    プラン残り日数を計算する
+
+    Args:
+        profile (dict): ユーザーのプロフィール情報
+
+    Returns:
+        int: 残り日数
+    """
+    plan = profile.get('plan', {})
+    start_date = datetime.strptime(plan['start_date'], '%Y-%m-%d')
+    total_days = plan['days']
+    today = datetime.now()
+    elapsed_days = (today - start_date).days
+    remaining = total_days - elapsed_days
+    return max(0, remaining)  # マイナスにならないようにする
 
 
 def generate_feedback(profile, report):
@@ -438,8 +536,14 @@ def main():
     # ウェルカムメッセージを表示
     print_welcome()
 
+    # プランを選択
+    selected_plan = select_plan()
+
     # ユーザーのプロフィールを取得
-    user_profile = get_user_profile()
+    user_profile = get_user_profile(selected_plan)
+
+    # プロフィールを保存
+    save_profile(user_profile)
 
     # 報告ループ開始のメッセージ
     print("\nそれでは、日々の報告を始めましょう！")
@@ -448,7 +552,23 @@ def main():
     # 日々の報告ループ
     day_count = 1  # 何日目かをカウント
     while True:
-        print(f"\n📅 {day_count}日目の報告")
+        # 残り日数を確認
+        remaining_days = calculate_remaining_days(user_profile)
+
+        # プラン期間が終了した場合
+        if remaining_days <= 0:
+            print("\n" + "=" * 60)
+            print(f"🎉 {user_profile['plan']['name']}が終了しました！")
+            print("=" * 60)
+            print(f"\n{user_profile['name']}さん、お疲れさまでした！")
+            print(f"{user_profile['plan']['days']}日間、よく頑張りました💪")
+            print("\n目標に向かって一緒に走り続けた日々、素晴らしかったです！")
+            print("これからも、この習慣を続けていってくださいね。")
+            print("\n引き続きサポートが必要な場合は、新しいプランをご検討ください。")
+            print("=" * 60)
+            break
+
+        print(f"\n📅 {day_count}日目の報告（残り{remaining_days}日）")
 
         # 今日の報告を取得
         daily_report = get_daily_report()
@@ -458,6 +578,7 @@ def main():
             print("\n" + "=" * 60)
             print("今日もお疲れさまでした！")
             print("また明日も頑張りましょう！💪")
+            print(f"\nプラン残り日数: {remaining_days}日")
             print("=" * 60)
             break
 
