@@ -176,7 +176,7 @@ def calculate_nutrition_baseline(meal_records):
 
 def calculate_target_nutrition(profile, baseline):
     """
-    体重の3-5%/月をベースに目標カロリーとPFCを計算する
+    ユーザーの希望減量ペースに基づいて目標カロリーとPFCを計算する
 
     Args:
         profile (dict): ユーザーのプロフィール情報
@@ -186,24 +186,17 @@ def calculate_target_nutrition(profile, baseline):
         dict: 目標カロリーとPFC
 
     Note:
-        - 山ごもりモード: 体重の5%/月（最大ペース）
-        - ベーシックモード: 体重の3%/月（推奨・標準ペース）
+        - ユーザーが設定した月間減量目標（kg/月）を使用
+        - 最大で体重の5%/月まで
     """
     baseline_calories = baseline['avg_calories']
 
-    # カロリー調整量を決定（体重の3-5%/月ベース）
+    # カロリー調整量を決定（ユーザーの希望減量ペースベース）
     calorie_adjustment = 0
     monthly_weight_loss_kg = 0
 
-    if profile.get('calorie_mode') and profile.get('current_weight'):
-        current_weight = profile['current_weight']
-        mode = profile['calorie_mode']
-
-        # 山ごもりモード: 体重の5%/月、ベーシックモード: 体重の3%/月
-        if mode == "山ごもり":
-            monthly_weight_loss_kg = current_weight * 0.05
-        else:  # ベーシック
-            monthly_weight_loss_kg = current_weight * 0.03
+    if profile.get('monthly_target_kg'):
+        monthly_weight_loss_kg = profile['monthly_target_kg']
 
         # 1日あたりの目標減量（kg/日）
         daily_weight_loss_kg = monthly_weight_loss_kg / 30
@@ -260,6 +253,19 @@ def get_user_profile(plan):
         else:
             print("「男性」または「女性」と入力してください。")
 
+    # 年齢を入力してもらう
+    age = None
+    while True:
+        try:
+            age_input = input("\n【年齢】年齢を教えてください\n> ")
+            age = int(age_input)
+            if age > 0 and age < 150:
+                break
+            else:
+                print("正しい年齢を入力してください。")
+        except ValueError:
+            print("数字で入力してください。")
+
     # 目的を入力してもらう
     purpose = input("\n【目的】目標は何ですか？（例：ダイエット、増量、健康維持など）\n> ")
 
@@ -282,22 +288,53 @@ def get_user_profile(plan):
         except ValueError:
             print("数字で入力してください（小数点もOKです）。")
 
-    # カロリー調整モードを選択してもらう（ダイエット目的の場合のみ）
-    calorie_mode = None
+    # 関口からの提案（ダイエット目的の場合のみ）
+    monthly_target_kg = None
     if 'ダイエット' in purpose or '減量' in purpose or '痩せ' in purpose:
-        print("\n" + "-" * 60)
-        print("【カロリー調整モード】")
-        print("-" * 60)
-        print("山ごもりモード: 体重の5%/月を目標（最大ペース）")
-        print("ベーシックモード: 体重の3%/月を目標（推奨・標準ペース）")
+        print("\n" + "=" * 60)
+        print("【関口からの提案】")
+        print("=" * 60)
 
+        # プラン期間を取得
+        plan_months = plan['days'] / 30
+
+        # ベーシックモード（3%）での推奨ペースを計算
+        recommended_monthly_kg = current_weight_kg * 0.03
+        total_recommended_kg = recommended_monthly_kg * plan_months
+
+        # 関口からのメッセージ
+        print(f"\n{name}さん、{plan['days']}日間のプランですね。")
+        print(f"現在の体重{current_weight_kg}kgから、無理なく健康的に減量するなら...")
+        print(f"\n💡 月に{recommended_monthly_kg:.1f}kgずつ（ベーシックモード）")
+        print(f"   {plan['days']}日間で約{total_recommended_kg:.1f}kg落とすペースがおすすめです！")
+        print(f"\nこれなら、体に負担をかけず、リバウンドしにくいですよ。")
+
+        # ユーザーの希望を聞く
+        print("\n" + "-" * 60)
         while True:
-            mode = input("\nどちらのモードで進めますか？（山ごもり または ベーシック）\n> ").strip()
-            if mode in ["山ごもり", "ベーシック"]:
-                calorie_mode = mode
+            try:
+                user_input = input(f"\n月に何kg落としたいですか？（推奨: {recommended_monthly_kg:.1f}kg）\n> ")
+                monthly_target_kg = float(user_input)
+
+                # 5％超えチェック
+                max_safe_monthly_kg = current_weight_kg * 0.05
+                if monthly_target_kg > max_safe_monthly_kg:
+                    print(f"\n⚠️  それは無茶ですよ！")
+                    print(f"\n体重{current_weight_kg}kgの場合、月に落とせるのは{max_safe_monthly_kg:.1f}kgまでです。")
+                    print(f"月に体重の5%以上減らすと、体がホメオスタシス（恒常性）で")
+                    print(f"「飢餓状態だ！」と判断して、代謝を下げてしまうんです。")
+                    print(f"\nそうなると、逆に痩せにくくなって、リバウンドしちゃいますよ。")
+                    print(f"健康的に、確実に結果を出すために、無理のないペースにしましょう！")
+                    print(f"\nもう一度入力してください。")
+                    continue
+
+                if monthly_target_kg <= 0:
+                    print("正の数を入力してください。")
+                    continue
+
                 break
-            else:
-                print("「山ごもり」または「ベーシック」と入力してください。")
+            except ValueError:
+                print("数字で入力してください。")
 
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
@@ -306,8 +343,8 @@ def get_user_profile(plan):
         weight_diff = current_weight_kg - target_weight_kg
         print(f"現在{current_weight_kg}kg → 目標{target_weight_kg}kg（-{weight_diff:.1f}kg）")
         print(f"{plan['days']}日間で達成を目指しましょう！")
-    if calorie_mode:
-        print(f"カロリー調整は{calorie_mode}モードで進めます！")
+    if monthly_target_kg:
+        print(f"月{monthly_target_kg:.1f}kgペースで進めます！")
     print("一緒に頑張りましょう💪")
     print("-" * 60 + "\n")
 
@@ -315,10 +352,11 @@ def get_user_profile(plan):
     return {
         "name": name,
         "gender": gender,
+        "age": age,
         "purpose": purpose,
         "current_weight": current_weight_kg,
         "target_weight": target_weight_kg,
-        "calorie_mode": calorie_mode,
+        "monthly_target_kg": monthly_target_kg,
         "plan": plan
     }
 
@@ -1017,7 +1055,7 @@ def main():
 
     # 準備期間を実施（ダイエット目的の場合のみ）
     enable_nutrition_tracking = False
-    if user_profile.get('calorie_mode'):
+    if user_profile.get('monthly_target_kg'):
         # 3日間の食事記録を実施
         meal_records = conduct_preparation_period(user_profile)
 
