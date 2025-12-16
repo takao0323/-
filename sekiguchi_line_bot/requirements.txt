@@ -1,0 +1,21 @@
+# LINE Messaging API SDK
+line-bot-sdk==3.5.0
+
+# Web Framework
+Flask==3.0.0
+
+# Scheduler for daily column delivery
+APScheduler==3.10.4
+
+# Data visualization (from existing main.py)
+matplotlib==3.8.2
+
+# HTTP requests
+requests==2.31.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Database (optional - for production)
+# psycopg2-binary==2.9.9
+# SQLAlchemy==2.0.23

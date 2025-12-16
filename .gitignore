@@ -40,3 +40,8 @@ Thumbs.db
 weight_data_*.csv
 weight_graph_*.png
 profile_*.json
+
+# LINE Bot
+sekiguchi_line_bot/.env
+sekiguchi_line_bot/rich_menu_image.png
+sekiguchi_line_bot/*.log
