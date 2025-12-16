@@ -32,6 +32,12 @@ sys.path.append(os.path.dirname(__file__))
 from handlers import weight_handler, meal_handler, lp_handler
 from handlers import column_handler, group_handler, qa_handler
 
+# スケジューラーをインポート
+from scheduler import create_scheduler
+
+# スケジューラーを起動（定期レポート配信用）
+report_scheduler = create_scheduler(line_bot_api)
+
 
 @app.route("/")
 def index():

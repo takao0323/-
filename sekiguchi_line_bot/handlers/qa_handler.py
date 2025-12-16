@@ -92,6 +92,7 @@ def handle_qa_menu(line_bot_api, event):
 
     # クイックリプライでカテゴリ選択
     quick_reply = QuickReply(items=[
+        QuickReplyButton(action=MessageAction(label="📊 レポートを見る", text="レポート表示")),
         QuickReplyButton(action=MessageAction(label="📋 プランについて", text="QA_プラン")),
         QuickReplyButton(action=MessageAction(label="🍽️ 食事について", text="QA_食事")),
         QuickReplyButton(action=MessageAction(label="💪 トレーニング", text="QA_トレーニング")),
