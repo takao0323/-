@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-関口ポケットメンターbot（ライト版）
+関口式ダイエットメンター
+フィジークマスターズ世界一×指導歴30年×人格搭載AI
 ダイエットや健康維持をサポートする、関口貴夫さん風のメンターbotです。
 """
 
@@ -18,22 +19,10 @@ import matplotlib.dates as mdates
 # プラン定義
 PLANS = {
     "1": {
-        "name": "３日間お試しプラン",
-        "price": "550円",
-        "days": 3,
-        "description": "まずは3日間、気軽に試してみましょう！"
-    },
-    "2": {
-        "name": "３ヵ月プラン",
+        "name": "月額プラン",
         "price": "月額990円",
-        "days": 90,
-        "description": "じっくり体質改善！3ヶ月でしっかり結果を出しましょう"
-    },
-    "3": {
-        "name": "６ヵ月プラン",
-        "price": "月額880円",
-        "days": 180,
-        "description": "最もお得！半年かけて理想の体を手に入れましょう"
+        "days": 30,
+        "description": "関口式ダイエットメンターで理想の体を手に入れましょう！"
     }
 }
 
@@ -41,7 +30,8 @@ PLANS = {
 def print_welcome():
     """ウェルカムメッセージを表示する"""
     print("=" * 60)
-    print("    関口ポケットメンターbot（ライト版）へようこそ！")
+    print("       関口式ダイエットメンターへようこそ！")
+    print("    フィジークマスターズ世界一×指導歴30年×人格搭載AI")
     print("=" * 60)
     print("あなたの健康とボディメイクをサポートします！")
     print()
@@ -67,7 +57,7 @@ def select_plan():
 
     # プランを選択
     while True:
-        choice = input("プランを選択してください（1, 2, 3）\n> ").strip()
+        choice = input("始めるには「1」を入力してください\n> ").strip()
         if choice in PLANS:
             selected_plan = PLANS[choice].copy()
             selected_plan["start_date"] = datetime.now().strftime('%Y-%m-%d')
@@ -76,7 +66,7 @@ def select_plan():
             print(f"料金: {selected_plan['price']}")
             return selected_plan
         else:
-            print("1, 2, 3のいずれかを入力してください。")
+            print("「1」を入力してください。")
 
 
 def conduct_preparation_period(profile):
