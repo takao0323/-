@@ -288,43 +288,41 @@ def get_user_profile(plan):
         # プラン期間を取得
         plan_months = plan['days'] / 30
 
-        # ベーシックモード（3%）での推奨ペースを計算
-        recommended_monthly_kg = current_weight_kg * 0.03
-        total_recommended_kg = recommended_monthly_kg * plan_months
+        # ライトプラン（2%）とハードプラン（4%）のペースを計算
+        light_monthly_kg = current_weight_kg * 0.02
+        hard_monthly_kg = current_weight_kg * 0.04
+        light_total_kg = light_monthly_kg * plan_months
+        hard_total_kg = hard_monthly_kg * plan_months
 
         # 関口からのメッセージ
         print(f"\n{name}さん、{plan['days']}日間のプランですね。")
-        print(f"現在の体重{current_weight_kg}kgから、無理なく健康的に減量するなら...")
-        print(f"\n💡 月に{recommended_monthly_kg:.1f}kgずつ（ベーシックモード）")
-        print(f"   {plan['days']}日間で約{total_recommended_kg:.1f}kg落とすペースがおすすめです！")
-        print(f"\nこれなら、体に負担をかけず、リバウンドしにくいですよ。")
+        print(f"現在の体重{current_weight_kg}kgから、健康的に減量するための2つのプランをご用意しました。")
+
+        print(f"\n【1】ライトプラン（体重の2%/月）")
+        print(f"    月に{light_monthly_kg:.1f}kgずつ、{plan['days']}日間で約{light_total_kg:.1f}kg減")
+        print(f"    → 無理なくゆっくり、確実に体質改善したい方向け")
+
+        print(f"\n【2】ハードプラン（体重の4%/月）")
+        print(f"    月に{hard_monthly_kg:.1f}kgずつ、{plan['days']}日間で約{hard_total_kg:.1f}kg減")
+        print(f"    → しっかり結果を出したい、意欲的な方向け")
+
+        print(f"\nどちらも科学的に安全な範囲です。あなたに合ったペースを選びましょう！")
 
         # ユーザーの希望を聞く
         print("\n" + "-" * 60)
         while True:
-            try:
-                user_input = input(f"\n月に何kg落としたいですか？（推奨: {recommended_monthly_kg:.1f}kg）\n> ")
-                monthly_target_kg = float(user_input)
+            plan_choice = input(f"\nどちらのプランで進めますか？（1 または 2）\n> ").strip()
 
-                # 5％超えチェック
-                max_safe_monthly_kg = current_weight_kg * 0.05
-                if monthly_target_kg > max_safe_monthly_kg:
-                    print(f"\n⚠️  それは無茶ですよ！")
-                    print(f"\n体重{current_weight_kg}kgの場合、月に落とせるのは{max_safe_monthly_kg:.1f}kgまでです。")
-                    print(f"月に体重の5%以上減らすと、体がホメオスタシス（恒常性）で")
-                    print(f"「飢餓状態だ！」と判断して、代謝を下げてしまうんです。")
-                    print(f"\nそうなると、逆に痩せにくくなって、リバウンドしちゃいますよ。")
-                    print(f"健康的に、確実に結果を出すために、無理のないペースにしましょう！")
-                    print(f"\nもう一度入力してください。")
-                    continue
-
-                if monthly_target_kg <= 0:
-                    print("正の数を入力してください。")
-                    continue
-
+            if plan_choice == "1":
+                monthly_target_kg = light_monthly_kg
+                print(f"\nライトプランを選択しました！月{monthly_target_kg:.1f}kgペースで進めます。")
                 break
-            except ValueError:
-                print("数字で入力してください。")
+            elif plan_choice == "2":
+                monthly_target_kg = hard_monthly_kg
+                print(f"\nハードプランを選択しました！月{monthly_target_kg:.1f}kgペースで進めます。")
+                break
+            else:
+                print("「1」または「2」を入力してください。")
 
     print("\n" + "-" * 60)
     print(f"{name}さん、よろしくお願いします！")
