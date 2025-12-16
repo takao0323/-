@@ -5,9 +5,15 @@
 週間レポート・月間レポートを生成・配信
 """
 
+import sys
+import os
+# sekiguchi_botモジュールをインポートできるようにパスを追加
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../sekiguchi_bot'))
+
 from datetime import datetime, timedelta
 from linebot.models import TextSendMessage, FlexSendMessage
 import statistics
+from optimized_philosophy import get_optimized_philosophy_message, analyze_user_situation
 
 
 def generate_weekly_report(user_id, user_name, weight_data, meal_data, profile):
@@ -435,33 +441,63 @@ def generate_future_outlook(weight_analysis, profile, period='週間'):
 
 
 def generate_philosophy_message_for_report(user_name, weight_analysis, current_status):
-    """レポート用の関口4要素メッセージ"""
+    """
+    レポート用の関口4要素メッセージ（最適化版）
+
+    個別の状況に合わせて、最適な要素の組み合わせを自動選択します
+    """
     change = weight_analysis['change']
 
-    if change < -0.5:
-        # 順調な場合
-        return {
-            'cheerleader': f"{user_name}さん、素晴らしい！目に見える成果が出ていますね。この調子で一緒に進みましょう！",
-            'comedian': f"体重計が喜んでる音が聞こえてきそうです（笑）。{user_name}さんの努力が数字に表れてますね！",
-            'bartender': f"{user_name}さん、頑張ってきた甲斐がありましたね。この成果を一緒に喜びましょう。",
-            'expert': f"科学的に理想的なペースです。筋肉を維持しながら脂肪を落とせている証拠。リバウンドしにくい健康的な減量ができています。"
-        }
-    elif change > 0.5:
-        # 増加した場合
-        return {
-            'cheerleader': f"{user_name}さん、増えても諦める必要はありません！ここからが本番です。一緒に乗り越えましょう！",
-            'comedian': f"体重計が「ちょっと待った！」って言ってますね（笑）。でも大丈夫、明日から巻き返しましょう！",
-            'bartender': f"増えた時って本当に落ち込みますよね。{user_name}さんの気持ち、よくわかります。でも、ここで報告できたこと自体が素晴らしいです。",
-            'expert': f"体重増加の多くは一時的な水分やグリコーゲンの蓄積です。食事と運動を見直せば、必ず改善します。ここで諦めないことが成功の鍵です。"
-        }
+    # 体重傾向を判定
+    if change < -0.3:
+        trend = "down"
+        days_plateau = 0
+    elif change > 0.3:
+        trend = "up"
+        days_plateau = 0
     else:
-        # 変化なしの場合
-        return {
-            'cheerleader': f"{user_name}さん、変化がなくても継続できていることが素晴らしい！停滞期を抜ければ大きな変化が待っています！",
-            'comedian': f"体重計が「今週はお休みモード」ですね（笑）。でも明日突然動き出す可能性大です！",
-            'bartender': f"変化がないと不安になりますよね。{user_name}さん、その気持ちよくわかります。でも、体の中では確実に変化が起きていますよ。",
-            'expert': f"停滞期は体が新しい体重に慣れようとしている時期。科学的には正常な反応です。ここで諦めずに続けると、必ず突然ストンと落ちる日が来ます。"
-        }
+        trend = "plateau"
+        # 変化が小さい場合は停滞期とみなす
+        days_plateau = 7
+
+    # 進捗率を計算（仮で50%とする。実際はprofileから計算）
+    total_progress = abs(change / 5.0 * 100) if change < 0 else 0
+
+    # 達成度（仮で80%とする。実際はカロリーデータから計算）
+    calorie_achievement = 100
+    exercise_frequency = 3
+
+    # 継続率（仮で85%とする。実際は記録日数から計算）
+    consistency_rate = 85
+    reporting_streak = 7
+
+    # 詳細な状況データを構築
+    weight_data = {
+        'recent_trend': trend,
+        'days_plateau': days_plateau,
+        'total_progress': total_progress
+    }
+
+    achievement_data = {
+        'calorie_achievement': calorie_achievement,
+        'pfc_balance': 90,
+        'exercise_frequency': exercise_frequency
+    }
+
+    consistency_data = {
+        'reporting_streak': reporting_streak,
+        'total_days': 30,
+        'consistency_rate': consistency_rate
+    }
+
+    # 状況を分析
+    situation_category = analyze_user_situation(weight_data, achievement_data, consistency_data)
+
+    # 最適化メッセージを生成
+    optimized_msg = get_optimized_philosophy_message(user_name, situation_category, weight_data)
+
+    # レポート用にbreakdownを返す（各要素を個別に表示する場合）
+    return optimized_msg['breakdown']
 
 
 def get_achievements(weight_analysis, calorie_analysis):

@@ -14,6 +14,7 @@ import base64
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from optimized_philosophy import get_simple_optimized_message, get_optimized_philosophy_message
 
 
 # プラン定義
@@ -764,6 +765,69 @@ def calculate_remaining_days(profile):
     return max(0, remaining)  # マイナスにならないようにする
 
 
+def calculate_user_statistics(name, profile):
+    """
+    ユーザーの統計情報を計算（最適化メッセージ用）
+
+    Args:
+        name (str): ユーザー名
+        profile (dict): プロフィール情報
+
+    Returns:
+        dict: 統計情報（consistency_rate, days_plateau, reporting_streak）
+    """
+    # 体重データを読み込んで統計計算
+    weight_file = f"weight_data_{name}.csv"
+
+    if not os.path.exists(weight_file):
+        return {
+            "consistency_rate": 100,
+            "days_plateau": 0,
+            "reporting_streak": 1
+        }
+
+    # CSVから体重データを読み込み
+    weight_history = []
+    with open(weight_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            weight_history.append({
+                'date': row['日付'],
+                'weight': float(row['体重'])
+            })
+
+    if len(weight_history) == 0:
+        return {
+            "consistency_rate": 100,
+            "days_plateau": 0,
+            "reporting_streak": 1
+        }
+
+    # 開始日からの経過日数と報告日数で継続率を計算
+    start_date = datetime.strptime(profile.get('start_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+    today = datetime.now()
+    total_days = (today - start_date).days + 1
+    reporting_days = len(weight_history)
+    consistency_rate = (reporting_days / total_days * 100) if total_days > 0 else 100
+
+    # 停滞日数を計算（直近7日の体重変化が±0.3kg以内）
+    days_plateau = 0
+    if len(weight_history) >= 7:
+        recent_weights = [w['weight'] for w in weight_history[-7:]]
+        weight_range = max(recent_weights) - min(recent_weights)
+        if weight_range <= 0.3:
+            days_plateau = 7
+
+    # 連続報告日数を計算（過去7日）
+    reporting_streak = min(len(weight_history), 7)
+
+    return {
+        "consistency_rate": consistency_rate,
+        "days_plateau": days_plateau,
+        "reporting_streak": reporting_streak
+    }
+
+
 def get_sekiguchi_philosophy_message(name, situation):
     """
     関口の指導哲学「100%のトレーナー = 25%チアリーダー×25%コメディアン×25%バーテンダー×25%専門家」
@@ -944,25 +1008,27 @@ def generate_feedback(profile, report):
     else:
         situation = "general"
 
-    # 関口の指導哲学（4要素）を反映したメッセージを取得
-    philosophy_msg = get_sekiguchi_philosophy_message(name, situation)
+    # ユーザー統計を計算
+    stats = calculate_user_statistics(name, profile)
+
+    # 最適化された関口の指導哲学（4要素）メッセージを取得
+    # 個別の状況に合わせて、最適な要素の組み合わせを自動選択
+    optimized_msg = get_simple_optimized_message(
+        name=name,
+        weight_change=weight_change,
+        consistency_rate=stats['consistency_rate'],
+        days_plateau=stats['days_plateau']
+    )
 
     print("\n" + "=" * 60)
-    print("【関口の指導哲学メッセージ】")
+    print("【関口の指導哲学メッセージ（状況別最適化）】")
     print("100%のトレーナー = 25%チアリーダー×25%コメディアン×25%バーテンダー×25%専門家")
+    print(f"今回の状況: {optimized_msg['situation_category']} | 主要要素: {optimized_msg['primary_element']}")
+    print(f"強調配分: {optimized_msg['emphasis']}")
     print("=" * 60)
 
-    print(f"\n🎺 チアリーダー（応援する）:")
-    print(f"  {philosophy_msg['cheerleader']}")
-
-    print(f"\n🎭 コメディアン（楽しませる）:")
-    print(f"  {philosophy_msg['comedian']}")
-
-    print(f"\n🍸 バーテンダー（傾聴する）:")
-    print(f"  {philosophy_msg['bartender']}")
-
-    print(f"\n🎓 専門家（科学的根拠）:")
-    print(f"  {philosophy_msg['expert']}")
+    # 統合メッセージを表示（状況に応じて最適化された組み合わせ）
+    print(f"\n{optimized_msg['message']}")
 
     # 目的別カスタマイズメッセージ
     purpose_message = get_purpose_specific_message(profile.get('purpose', ''), weight_change)
