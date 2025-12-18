@@ -48,12 +48,21 @@ class ReportScheduler:
             replace_existing=True
         )
 
-        # コラム配信：毎朝8:00
+        # コラム配信：毎日20:00
         self.scheduler.add_job(
             func=self.send_daily_column,
-            trigger=CronTrigger(hour=8, minute=0),
+            trigger=CronTrigger(hour=20, minute=0),
             id='daily_column',
             name='コラム配信',
+            replace_existing=True
+        )
+
+        # グループ励ましメッセージ：毎日10:00
+        self.scheduler.add_job(
+            func=self.send_group_encouragement,
+            trigger=CronTrigger(hour=10, minute=0),
+            id='group_encouragement',
+            name='グループ励ましメッセージ',
             replace_existing=True
         )
 
@@ -167,6 +176,28 @@ class ReportScheduler:
             logger.info(f"コラム配信成功: {len(user_ids)}名")
         except Exception as e:
             logger.error(f"コラム配信失敗: {e}")
+
+    def send_group_encouragement(self):
+        """
+        グループに励ましメッセージを配信
+        """
+        from handlers.group_handler import send_group_encouragement
+        import os
+
+        logger.info("グループ励ましメッセージ配信開始")
+
+        # グループIDを取得（環境変数から）
+        group_id = os.getenv('GROUP_LINE_ID', None)
+
+        if not group_id:
+            logger.warning("グループIDが設定されていません")
+            return
+
+        try:
+            send_group_encouragement(self.line_bot_api, group_id)
+            logger.info("グループ励ましメッセージ配信成功")
+        except Exception as e:
+            logger.error(f"グループ励ましメッセージ配信失敗: {e}")
 
     def get_active_users(self):
         """
