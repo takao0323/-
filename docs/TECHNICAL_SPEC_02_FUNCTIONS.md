@@ -139,109 +139,222 @@ def generate_weight_graph(user_id):
 
 ---
 
-## 2. 食事報告・PFC分析機能
+## 2. 食事報告・PFC分析機能（Gemini AI 自動解析）
 
 ### 2.1 機能概要
-ユーザーが送信した食事内容を分析し、PFCバランス（タンパク質・脂質・炭水化物）の評価とアドバイスを返信する。
+ユーザーが送信した食事の写真をGoogle Gemini AIで自動解析し、料理名・カロリー・PFCバランス（タンパク質・脂質・炭水化物）を推定して評価とアドバイスを返信する。
 
 ### 2.2 入力仕様
 
-**ユーザー入力例:**
-```
-朝食: プロテイン、バナナ
-昼食: 鶏胸肉、ブロッコリー、玄米
-夕食: サーモン、サラダ
-```
+**ユーザー入力:**
+- **画像のみ**（写真撮影またはアップロード）
+- 推奨: 料理全体が写るように撮影
 
-**キーワード検出:**
-- 食事タイミング: 朝食、昼食、夕食、間食、朝、昼、夜
-- 高タンパク: 鶏肉、牛肉、豚肉、魚、卵、プロテイン、豆腐、納豆
-- 炭水化物: 米、パン、麺、パスタ、芋、果物
-- 脂質: 油、バター、ナッツ、アボカド
-- 野菜: サラダ、ブロッコリー、ほうれん草、トマト
+**画像形式:**
+- JPEG、PNG対応
+- ファイルサイズ: LINE Messaging API の制限内（10MB以下推奨）
 
 ### 2.3 処理フロー
 
 ```
-1. 食事報告テキスト受信
+1. リッチメニュー「②今日の食事」タップ
    ↓
-2. キーワード解析
-   ├─ タンパク質食材カウント
-   ├─ 炭水化物食材カウント
-   ├─ 脂質食材カウント
-   └─ 野菜食材カウント
+2. 食事記録モード ON
    ↓
-3. PFCバランス評価
-   ├─ 理想比率: P=30%, F=20%, C=50%
-   ├─ タンパク質過多/不足判定
-   ├─ 炭水化物過多/不足判定
-   └─ 脂質過多判定
+3. ユーザーが食事写真を送信（ImageMessage）
    ↓
-4. フィードバックメッセージ生成
-   ├─ バランス評価（良好/改善点）
-   ├─ 具体的アドバイス
-   └─ 4要素哲学メッセージ
+4. LINE APIから画像ダウンロード
    ↓
-5. TextMessage で返信
+5. Gemini API に画像を送信
+   ├─ モデル: gemini-1.5-flash
+   ├─ プロンプト: 料理名、カロリー、PFC推定を依頼
+   └─ レスポンス: JSON形式で取得
+   ↓
+6. Gemini解析結果パース
+   ├─ dishes: 料理名
+   ├─ total_calories: 総カロリー (kcal)
+   ├─ protein_g: タンパク質 (g)
+   ├─ fat_g: 脂質 (g)
+   ├─ carbs_g: 炭水化物 (g)
+   └─ balance_evaluation: バランス評価
+   ↓
+7. PFC比率計算
+   ├─ タンパク質比率 = (protein_g × 4 / 総カロリー) × 100
+   ├─ 脂質比率 = (fat_g × 9 / 総カロリー) × 100
+   └─ 炭水化物比率 = (carbs_g × 4 / 総カロリー) × 100
+   ↓
+8. 4要素哲学メッセージ生成
+   ├─ 専門家メッセージ（PFC評価に基づく）
+   ├─ チアリーダーメッセージ
+   ├─ バーテンダーメッセージ
+   └─ コメディアンメッセージ
+   ↓
+9. フィードバックメッセージ送信
+   ↓
+10. 食事記録モード OFF
 ```
 
-### 2.4 PFC分析ロジック
+### 2.4 Gemini AI 解析仕様
+
+**Gemini API 設定:**
+- **モデル:** `gemini-1.5-flash`（高速・コスト効率重視）
+- **入力:** 食事画像 + プロンプト
+- **出力:** JSON形式
+
+**プロンプト例:**
+```
+この食事画像を分析して、以下の情報をJSON形式で返してください：
+
+1. dishes: 料理名（複数ある場合はカンマ区切り）
+2. total_calories: 総カロリー（kcal）の推定値（数値のみ）
+3. protein_g: タンパク質（g）の推定値（数値のみ）
+4. fat_g: 脂質（g）の推定値（数値のみ）
+5. carbs_g: 炭水化物（g）の推定値（数値のみ）
+6. balance_evaluation: PFCバランスの評価（「良好」「タンパク質不足」「炭水化物過多」など）
+
+必ずJSON形式で返してください。
+```
+
+**レスポンス例:**
+```json
+{
+  "dishes": "鶏胸肉のグリル、ブロッコリー、玄米",
+  "total_calories": 650,
+  "protein_g": 45,
+  "fat_g": 15,
+  "carbs_g": 70,
+  "balance_evaluation": "良好"
+}
+```
+
+### 2.5 フィードバックメッセージ生成
 
 **実装例:**
 ```python
-def analyze_meal(text):
-    protein_keywords = ['鶏肉', '牛肉', '豚肉', '魚', '卵', 'プロテイン', '豆腐', '納豆']
-    carb_keywords = ['米', 'パン', '麺', 'パスタ', '芋', '果物']
-    fat_keywords = ['油', 'バター', 'ナッツ', 'アボカド']
-    veggie_keywords = ['サラダ', 'ブロッコリー', 'ほうれん草', 'トマト']
+def generate_meal_feedback(analysis_result):
+    dishes = analysis_result.get('dishes', '不明')
+    calories = analysis_result.get('total_calories', 0)
+    protein = analysis_result.get('protein_g', 0)
+    fat = analysis_result.get('fat_g', 0)
+    carbs = analysis_result.get('carbs_g', 0)
+    balance = analysis_result.get('balance_evaluation', '')
 
-    protein_count = sum(1 for kw in protein_keywords if kw in text)
-    carb_count = sum(1 for kw in carb_keywords if kw in text)
-    fat_count = sum(1 for kw in fat_keywords if kw in text)
-    veggie_count = sum(1 for kw in veggie_keywords if kw in text)
+    # PFC比率計算
+    total_kcal_from_pfc = (protein * 4) + (fat * 9) + (carbs * 4)
+    protein_ratio = (protein * 4 / total_kcal_from_pfc) * 100
+    fat_ratio = (fat * 9 / total_kcal_from_pfc) * 100
+    carbs_ratio = (carbs * 4 / total_kcal_from_pfc) * 100
 
-    # バランス評価
-    feedback = []
+    # 4要素メッセージ生成
+    expert_msg = generate_expert_message(protein, fat, carbs, balance)
+    cheerleader_msg = generate_cheerleader_message(balance)
+    bartender_msg = generate_bartender_message(balance)
+    comedian_msg = generate_comedian_message(dishes, calories)
 
-    if protein_count >= 2:
-        feedback.append("🎓 タンパク質摂取が良好です！")
-    elif protein_count == 0:
-        feedback.append("⚠️ タンパク質が不足しています。1食20g以上を目安に。")
+    # 結合
+    feedback = f"""🍽️ 食事記録完了！
 
-    if carb_count >= 3:
-        feedback.append("⚠️ 炭水化物がやや多めです。減量中は控えめに。")
-    elif carb_count == 0:
-        feedback.append("💡 エネルギー源として適量の炭水化物も必要です。")
+【AI解析結果】
+📋 料理: {dishes}
 
-    if veggie_count >= 2:
-        feedback.append("🎺 野菜もしっかり摂れていますね！")
+【栄養情報】
+🔥 カロリー: {calories:.0f} kcal
+
+タンパク質: {protein:.1f}g ({protein_ratio:.1f}%)
+脂質: {fat:.1f}g ({fat_ratio:.1f}%)
+炭水化物: {carbs:.1f}g ({carbs_ratio:.1f}%)
+
+PFCバランス: {balance}
+
+【関口からのフィードバック】
+
+{expert_msg}
+
+{cheerleader_msg}
+
+{bartender_msg}
+
+{comedian_msg}
+
+この調子で頑張りましょう💪"""
 
     return feedback
 ```
 
-### 2.5 メッセージバリエーション
+### 2.6 4要素別メッセージロジック
 
-**4要素別アドバイステンプレート:**
+**専門家メッセージ（状態別）:**
+```python
+def generate_expert_message(protein, fat, carbs, balance):
+    if "タンパク質不足" in balance or protein < 20:
+        return """🎓 専門家として:
+タンパク質が少し不足しています。
+1食あたり20g以上を目安に、
+鶏肉・魚・卵などを追加しましょう。"""
+    elif "炭水化物過多" in balance or carbs > 100:
+        return """🎓 専門家として:
+炭水化物がやや多めです。
+減量中は1食40-60gを目安に
+調整していきましょう。"""
+    # ... 他の条件
+```
 
-- **専門家（🎓）:** 栄養学的根拠
-  - 「タンパク質は体重×1.5g/日が目安です」
-  - 「炭水化物は1食あたり40g以内に抑えましょう」
+**チアリーダーメッセージ:**
+```python
+def generate_cheerleader_message(balance):
+    if "良好" in balance:
+        return """🎺 チアリーダーとして:
+完璧なバランスですね！
+この調子で継続していきましょう！"""
+    # ... 他の条件
+```
 
-- **チアリーダー（🎺）:** 承認・励まし
-  - 「素晴らしい食事内容ですね！」
-  - 「この調子で継続していきましょう！」
+**バーテンダーメッセージ:**
+```python
+def generate_bartender_message(balance):
+    if "良好" in balance:
+        return """🍸 バーテンダーとして:
+バランスを意識できていますね。
+素晴らしいです。"""
+    # ... 他の条件
+```
 
-- **バーテンダー（🍸）:** 共感・理解
-  - 「外食続きで大変でしたね」
-  - 「完璧じゃなくても大丈夫ですよ」
+**コメディアンメッセージ:**
+```python
+def generate_comedian_message(dishes, calories):
+    if calories > 1000:
+        return f"""🎭 コメディアンとして:
+{calories:.0f}kcal！？
+パワフルな食事ですね（笑）
+次はもう少し控えめでいきましょう！"""
+    # ... 他の条件
+```
 
-- **コメディアン（🎭）:** ユーモア
-  - 「プロテイン3杯！？筋肉に愛されすぎですね笑」
-  - 「野菜ゼロ...今日は草食系お休みですか？」
+### 2.7 エラーハンドリング
 
-### 2.6 実装ファイル
-- `sekiguchi_line_bot/handlers/meal_handler.py`
-- `sekiguchi_bot/advice_data.py` (4900パターンのアドバイスデータ)
+**Gemini API エラー:**
+- タイムアウト: 10秒でリトライ
+- 解析失敗: 「⚠️ 画像の解析に失敗しました。もう一度撮影してください。」
+
+**画像ダウンロード失敗:**
+- LINE API エラー: 「⚠️ エラーが発生しました。もう一度お試しください。」
+
+### 2.8 環境変数
+
+**必須:**
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+**取得方法:**
+1. Google AI Studio にアクセス
+2. API Key を生成
+3. .env に設定
+
+### 2.9 実装ファイル
+- `sekiguchi_line_bot/handlers/meal_handler.py` - Gemini連携メインロジック
+- `sekiguchi_line_bot/app.py` - 画像メッセージハンドラー
+- `requirements.txt` - `google-generativeai==0.3.2` 追加
 
 ---
 

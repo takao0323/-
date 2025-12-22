@@ -94,9 +94,13 @@ def handle_text_message(event):
     elif weight_handler.is_weight_input_mode(user_id) and is_number(text):
         weight_handler.handle_weight_input(line_bot_api, event, float(text))
 
-    # 食事記録モード
+    # 食事記録モード（画像待ち）
     elif meal_handler.is_meal_input_mode(user_id):
-        meal_handler.handle_meal_input(line_bot_api, event, text)
+        reply_text = "📸 食事の写真を送ってください。\n\nAIが自動的に解析します！"
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=reply_text)
+        )
 
     # Q&A個別質問モード
     elif qa_handler.is_question_mode(user_id):
